@@ -1,0 +1,17 @@
+[Unit]
+Description=Dev Harbor PM2 development monitor
+After=network.target
+
+[Service]
+Type=simple
+User=dev
+WorkingDirectory=/home/dev
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=PM2_HOME=/home/dev/.pm2
+# Admin credentials are read from projects.json. Complete setup before enabling this service.
+ExecStart=/home/dev/bin/simple-pm2-monitor -non-interactive -config /home/dev/projects.json
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

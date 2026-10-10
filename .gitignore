@@ -1,0 +1,23 @@
+# Local project configuration and temporary files from atomic saves
+/projects*.json
+!/projects.example.json
+/.projects-*.json
+*.local.json
+
+# Local environment variables and access tokens
+.env
+.env.*
+!.env.example
+pm2-monitor.env
+
+# Go executable, build directories, tests and profiling output
+/simple-pm2-monitor
+/simple-pm2-monitor.exe
+bin/
+obj/
+/build/
+/dist/
+*.test
+*.out
+*.prof
+/coverage/

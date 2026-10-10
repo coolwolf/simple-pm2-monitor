@@ -1,0 +1,31 @@
+{
+  "listen": "127.0.0.1:8989",
+  "adminUsername": "admin",
+  "adminPassword": "replace-with-your-password",
+  "projects": [
+    {
+      "name": "shop-api",
+      "group": "shop",
+      "cwd": "/home/dev/projects/shop-api",
+      "command": "/usr/bin/dotnet",
+      "args": ["run", "--urls", "http://0.0.0.0:5001"],
+      "env": {"ASPNETCORE_ENVIRONMENT": "Development"},
+      "watchFiles": false,
+      "port": 5001,
+      "metricsUrl": "",
+      "requestMetric": "http_requests_total"
+    },
+    {
+      "name": "shop-web",
+      "group": "shop",
+      "cwd": "/home/dev/projects/shop-web",
+      "command": "/usr/bin/npm",
+      "args": ["run", "dev", "--", "--port", "3000"],
+      "env": {"NODE_ENV": "development"},
+      "watchFiles": true,
+      "port": 3000,
+      "metricsUrl": "",
+      "requestMetric": "http_requests_total"
+    }
+  ]
+}

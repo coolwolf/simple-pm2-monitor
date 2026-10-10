@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Simple PM2 Monitor</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <span class="logo">⌘</span>
+        <div>
+          Simple PM2 Monitor<small
+            >Simply watch your development projects</small
+          >
+        </div>
+      </div>
+      <div class="header-actions">
+        <span id="connection">Connecting…</span
+        ><button id="auth">Admin login</button
+        ><button id="config">Configuration</button
+        ><button id="add" class="primary">+ Add project</button>
+      </div>
+    </header>
+    <main>
+      <div class="intro">
+        <div>
+          <div class="eyebrow">YOUR DEVELOPMENT ENVIRONMENT</div>
+          <h1>Your projects, in one place.</h1>
+          <p>Group, run, and monitor your services.</p>
+        </div>
+        <button id="refresh">↻ Refresh</button>
+      </div>
+      <div id="notice" role="status" hidden></div>
+      <section class="stats">
+        <div><span>TOTAL PROJECTS</span><strong id="total">—</strong></div>
+        <div><span>RUNNING PROJECTS</span><strong id="online">—</strong></div>
+        <div><span>CPU · PM2 PROCESSES</span><strong id="cpu">—</strong></div>
+        <div>
+          <span>RAM · PM2 PROCESSES</span><strong id="memory">—</strong>
+        </div>
+      </section>
+      <div class="toolbar">
+        <input
+          id="search"
+          placeholder="Search projects, directories, or groups…"
+          aria-label="Search projects"
+        /><label><input id="running" type="checkbox" /> Running only</label
+        ><span>Refreshes every 5 seconds</span>
+      </div>
+      <div id="groups"></div>
+      <p class="footnote">
+        CPU/RAM values come from PM2 and may exclude child processes. Ports come
+        from configuration. Network traffic is not measured. Requests/s requires
+        a Prometheus counter.
+      </p>
+    </main>
+    <dialog id="projectDialog">
+      <form id="projectForm">
+        <div class="dialog-head">
+          <h2 id="projectTitle">Add project</h2>
+          <button
+            type="button"
+            data-close="projectDialog"
+            aria-label="Close project form"
+          >
+            ✕
+          </button>
+        </div>
+        <p id="projectHelp">
+          Saving a project does not start it. PM2 runs the command in the
+          selected directory.
+        </p>
+        <section class="discovery">
+          <label
+            >Solution / project file or directory on the server
+            <div class="discovery-path">
+              <input
+                id="sourcePath"
+                placeholder="/home/dev/shop/Shop.sln or /home/dev/shop-web"
+                aria-label="Server path to inspect"
+              /><button
+                id="browseSource"
+                type="button"
+                aria-label="Browse server project files"
+              >
+                ...</button
+              ><button id="discover" type="button">Read settings</button>
+            </div></label
+          >
+          <p id="discoveryStatus" role="status">
+            Choose a .sln, .slnx, .csproj, or package.json. Reading settings
+            does not start the project.
+          </p>
+          <div id="discoveryResult" hidden>
+            <label
+              >Project / run target<select
+                id="discoveryTarget"
+                aria-label="Discovered project or run target"
+              ></select
+            ></label>
+            <p id="discoveryInfo"></p>
+          </div>
+        </section>
+        <div class="form-grid">
+          <label
+            >Project name<input
+              id="projectName"
+              name="name"
+              required
+              placeholder="shop-api"
+          /></label>
+          <label
+            >Group<input
+              id="projectGroup"
+              name="group"
+              list="groupOptions"
+              placeholder="Choose a group or enter a new name" /><datalist
+              id="groupOptions"
+            ></datalist
+          ></label>
+          <label class="wide"
+            >Working directory
+            <div class="path-input">
+              <input
+                id="projectCwd"
+                name="cwd"
+                required
+                placeholder="/home/dev/projects/shop-api"
+              /><button
+                id="browseCwd"
+                type="button"
+                aria-label="Browse server directories"
+              >
+                ...
+              </button>
+            </div></label
+          >
+          <label
+            >Command<input
+              id="projectCommand"
+              name="command"
+              required
+              placeholder="/usr/bin/dotnet"
+          /></label>
+          <label id="watchLabel" class="wide" hidden>
+            <span><input id="projectWatch" type="checkbox" /> Watch files</span>
+            <p id="watchHelp">When disabled, use Restart to apply code changes.</p>
+          </label>
+          <label
+            >Port<input
+              id="projectPort"
+              name="port"
+              type="number"
+              min="0"
+              max="65535"
+              placeholder="5001"
+          /></label>
+          <label class="wide"
+            >Arguments · JSON array<textarea
+              id="projectArgs"
+              name="args"
+              rows="2"
+              placeholder='["run", "--urls", "http://0.0.0.0:5001"]'
+            >
+[]</textarea>
+          </label>
+          <label class="wide"
+            >Environment variables · JSON object<textarea
+              id="projectEnv"
+              name="env"
+              rows="2"
+            >
+{}</textarea>
+          </label>
+          <label class="wide"
+            >Prometheus metrics URL · optional<input
+              id="projectMetricsURL"
+              name="metricsUrl"
+              type="url"
+              placeholder="http://127.0.0.1:5001/metrics"
+          /></label>
+          <label class="wide"
+            >Request counter name<input
+              id="projectRequestMetric"
+              name="requestMetric"
+              placeholder="http_requests_total"
+          /></label>
+        </div>
+        <p id="projectError" class="form-error" role="alert"></p>
+        <div class="dialog-footer">
+          <button type="button" data-close="projectDialog">Cancel</button
+          ><button id="projectSave" class="primary" type="submit">
+            Save project
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="browseDialog">
+      <div class="dialog-head">
+        <h2 id="browseTitle">Browse server</h2>
+        <button data-close="browseDialog" aria-label="Close server browser">
+          ✕
+        </button>
+      </div>
+      <p>
+        Browse files on the server using the dashboard's OS user permissions.
+      </p>
+      <form id="browseForm" class="path-input">
+        <input
+          id="browsePath"
+          aria-label="Current server directory"
+          placeholder="Absolute directory path"
+        /><button type="submit">Go</button>
+      </form>
+      <div class="browse-toolbar">
+        <button id="browseHome" type="button">Home</button
+        ><button id="browseUp" type="button">Up</button
+        ><label
+          ><input id="browseHidden" type="checkbox" /> Show hidden
+          entries</label
+        >
+      </div>
+      <p id="browseStatus" role="status"></p>
+      <div
+        id="browseEntries"
+        class="browse-entries"
+        aria-label="Server directories and project files"
+      ></div>
+      <div class="dialog-footer">
+        <button data-close="browseDialog">Cancel</button
+        ><button id="browseSelect" type="button" class="primary">
+          Select this directory
+        </button>
+      </div>
+    </dialog>
+    <dialog id="deleteDialog">
+      <div class="dialog-head">
+        <h2>Delete project</h2>
+        <button
+          data-close="deleteDialog"
+          aria-label="Close delete confirmation"
+        >
+          ✕
+        </button>
+      </div>
+      <p>
+        Remove <strong id="deleteName"></strong> from the dashboard
+        configuration?
+      </p>
+      <p>
+        This does not stop or delete its PM2 processes, or remove project files.
+        Existing PM2 processes will appear as unmanaged. Stop the project first
+        if you want it to stop running.
+      </p>
+      <p id="deleteError" class="form-error" role="alert"></p>
+      <div class="dialog-footer">
+        <button data-close="deleteDialog">Cancel</button
+        ><button id="confirmDelete" class="danger">Delete project</button>
+      </div>
+    </dialog>
+    <dialog id="configDialog">
+      <div class="dialog-head">
+        <h2>Project configuration</h2>
+        <button data-close="configDialog" aria-label="Close configuration">
+          ✕
+        </button>
+      </div>
+      <p>
+        Manage groups and startup order here. Listening address changes require
+        restarting the dashboard. Admin credential changes apply immediately.
+        Projects stop in reverse order. Removing a project does not stop its PM2
+        processes. Projects with an explicit watchFiles setting apply launch settings on Restart. Other command/environment changes apply to new PM2 records.
+      </p>
+      <textarea
+        id="configText"
+        rows="20"
+        spellcheck="false"
+        aria-label="JSON configuration"
+      ></textarea>
+      <div class="dialog-footer">
+        <button data-close="configDialog">Cancel</button
+        ><button id="saveConfig" class="primary">Save</button>
+      </div>
+    </dialog>
+    <dialog id="logsDialog">
+      <div class="dialog-head">
+        <h2 id="logTitle">Logs</h2>
+        <button data-close="logsDialog" aria-label="Close logs">✕</button>
+      </div>
+      <div class="log-toolbar">
+        <select id="logInstance" aria-label="Process instance"></select
+        ><button id="refreshLogs">↻ Refresh</button
+        ><button id="clearLogs" class="danger" type="button">Clear Logs</button
+        ><span>Last 64 KiB per file</span>
+      </div>
+      <h3>Standard output</h3>
+      <pre id="stdout"></pre>
+      <h3>Standard error</h3>
+      <pre id="stderr"></pre>
+      <p id="logWarnings"></p>
+    </dialog>
+    <dialog id="authDialog">
+      <form id="authForm">
+        <div class="dialog-head">
+          <h2>Admin login</h2>
+          <button
+            type="button"
+            data-close="authDialog"
+            aria-label="Close login"
+          >
+            ✕
+          </button>
+        </div>
+        <p>
+          Sign in with the username and password set during setup. Credentials
+          are kept for this browser tab's session.
+        </p>
+        <p id="authError" role="alert"></p>
+        <label id="usernameLabel"
+          >Username<input
+            id="username"
+            required
+            value="admin"
+            autocomplete="username"
+        /></label>
+        <label
+          >Password<input
+            id="password"
+            type="password"
+            required
+            autocomplete="current-password"
+            aria-label="Password"
+        /></label>
+        <div class="dialog-footer">
+          <button class="primary" type="submit">Sign in</button>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>
