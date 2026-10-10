@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.svg" width="96" alt="simple-pm2-monitor">
+  <img src="web/logo.svg" width="96" alt="simple-pm2-monitor">
 </p>
 # Simple PM2 Monitor
 
