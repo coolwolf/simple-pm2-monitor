@@ -1,3 +1,6 @@
+<p align="center">
+  <img src="logo.svg" width="96" alt="simple-pm2-monitor">
+</p>
 # Simple PM2 Monitor
 
 A dependency-free Go web dashboard for managing .NET and Next.js projects on a Debian development server. The UI is embedded in the Go executable, so the dashboard needs no Node.js runtime, database, or separate frontend build. Running your projects requires PM2 and their .NET/Node.js tools.
@@ -125,7 +128,7 @@ Example for .NET development:
   "cwd": "/home/dev/projects/shop-api",
   "command": "/usr/bin/dotnet",
   "args": ["run", "--urls", "http://0.0.0.0:5001"],
-  "env": {"ASPNETCORE_ENVIRONMENT": "Development"},
+  "env": { "ASPNETCORE_ENVIRONMENT": "Development" },
   "watchFiles": false,
   "port": 5001,
   "metricsUrl": "",
@@ -142,7 +145,6 @@ Commands and arguments are separate; the dashboard does not invoke a shell. Oper
 Click a project's port to open its HTTP root URL in a new browser tab. The link uses the hostname/IP from the browser's dashboard address and the configured project port. For example, `http://192.168.1.10:8989` with project port `5180` opens `http://192.168.1.10:5180/`. Hostnames, IPv4, and IPv6 addresses are supported. Dashboard paths, query strings, and its port are not carried over. The generated link uses HTTP because a port alone cannot determine the application's protocol; HTTPS-only services need their actual HTTPS URL.
 
 With an SSH tunnel to `localhost:8989`, project links also use localhost: forward each project port separately, for example `ssh -N -L 8989:127.0.0.1:8989 -L 5180:127.0.0.1:5180 dev@your-server`. A reverse proxy for the dashboard does not automatically expose project ports on the same hostname. The application must listen on an address reachable through your chosen connection. These links do not open firewall ports, forward traffic, or check endpoint readiness.
-
 
 ### File watching and manual restarts
 
@@ -283,7 +285,7 @@ scrape_configs:
     scrape_interval: 15s
     metrics_path: /metrics
     static_configs:
-      - targets: ['127.0.0.1:5001']
+      - targets: ["127.0.0.1:5001"]
 ```
 
 For Next.js, add another job with its port and actual metrics path, such as `/api/metrics`. Validate the configuration, enable the service, and apply changes:
