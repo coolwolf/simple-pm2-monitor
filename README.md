@@ -1,6 +1,7 @@
 <p align="center">
   <img src="web/logo.svg" width="96" alt="simple-pm2-monitor">
 </p>
+
 # Simple PM2 Monitor
 
 A dependency-free Go web dashboard for managing .NET and Next.js projects on a Debian development server. The UI is embedded in the Go executable, so the dashboard needs no Node.js runtime, database, or separate frontend build. Running your projects requires PM2 and their .NET/Node.js tools.
