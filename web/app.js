@@ -3,6 +3,7 @@ const $ = id => document.getElementById(id);
 let projects = [], config = {projects: []}, busy = false, polling = false, authRequired = false;
 let discoveredCandidates = [], editingProject = null, deletingProject = null, lastProjectGroup = '';
 let browseTarget = 'sourcePath', browseDirectory = '', browseParent = '', browseLoading = false, lastBrowsePath = '';
+let serviceBusy = false, serviceSwitching = false;
 let logsManaged = false, clearingLogs = false, logRequestVersion = 0;
 try { lastBrowsePath = localStorage.getItem('pm2-last-directory') || ''; } catch (_) {}
 const labels = {online: 'Running', stopped: 'Stopped', errored: 'Error', not_registered: 'Not started', launching: 'Starting', mixed: 'Mixed status', stopping: 'Stopping'};
@@ -259,6 +260,39 @@ async function clearLogs() {
   } catch (error) { $('logWarnings').textContent = error.message; }
   finally { clearingLogs = false; $('clearLogs').disabled = !logsManaged; $('refreshLogs').disabled = false; $('logInstance').disabled = false; }
 }
+function showServiceStatus(data) {
+  $('serviceStatus').textContent = data.available ? (data.runningAsService ? 'This dashboard is running as a user service.' : data.active ? 'A user service is already active.' : 'This dashboard is running in the foreground.') + ' Autostart: ' + (data.enabled ? 'enabled.' : 'disabled.') : 'User service unavailable.';
+  $('serviceHint').textContent = [data.unitPath ? 'Unit: ' + data.unitPath : '', data.hint || ''].filter(Boolean).join('\n');
+  $('serviceError').textContent = data.error || '';
+  $('enableService').textContent = data.runningAsService ? 'Enable autostart' : 'Run as service';
+  $('enableService').disabled = !data.available || serviceBusy || serviceSwitching || (data.runningAsService && data.enabled) || (data.active && !data.runningAsService);
+  $('disableService').disabled = !data.enabled || serviceBusy || serviceSwitching;
+}
+async function loadServiceStatus() {
+  try { showServiceStatus(await api('service')); }
+  catch (error) { $('serviceError').textContent = error.message; $('enableService').disabled = true; $('disableService').disabled = true; }
+}
+async function serviceAction(action) {
+  if (serviceBusy || serviceSwitching) return;
+  let actionError = '';
+  serviceBusy = true; $('enableService').disabled = true; $('disableService').disabled = true; $('refreshService').disabled = true; $('serviceError').textContent = '';
+  try {
+    const data = await api('service', 'POST', {action});
+    if (data.handoff) {
+      serviceSwitching = true; $('serviceStatus').textContent = 'Switching to the user service. Waiting for the dashboard to reconnect…';
+      setTimeout(() => checkServiceHandoff(0), 1000);
+    } else { notice(data.message); showServiceStatus(data.status); }
+  } catch (error) { actionError = error.message; }
+  finally { serviceBusy = false; $('refreshService').disabled = false; if (!serviceSwitching) await loadServiceStatus(); if (actionError) $('serviceError').textContent = actionError; }
+}
+async function checkServiceHandoff(attempt) {
+  try {
+    const data = await api('service');
+    if (data.runningAsService) { serviceSwitching = false; showServiceStatus(data); notice('Dashboard is now running as a user service.'); await refresh(); return; }
+  } catch (_) {}
+  if (attempt < 19) { setTimeout(() => checkServiceHandoff(attempt + 1), 1000); return; }
+  serviceSwitching = false; $('serviceError').textContent = 'Could not verify the service handover. Check journalctl --user -u simple-pm2-monitor, then refresh service status.';
+}
 for (const element of document.querySelectorAll('[data-close]')) element.addEventListener('click', () => $(element.dataset.close).close());
 $('refresh').addEventListener('click', refresh); $('search').addEventListener('input', render); $('running').addEventListener('change', render);
 $('add').addEventListener('click', () => openProjectForm()); $('projectForm').addEventListener('submit', saveProject);
@@ -274,7 +308,10 @@ $('browseHidden').addEventListener('change', () => browseDirectoryAt(browseDirec
 $('browseSelect').addEventListener('click', () => selectBrowsePath(browseDirectory));
 $('sourcePath').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); discoverProject(); } });
 $('confirmDelete').addEventListener('click', deleteProject);
-$('config').addEventListener('click', async () => { try { $('configText').value = JSON.stringify(await loadConfig(), null, 2); $('configDialog').showModal(); } catch (error) { notice(error.message); } });
+$('config').addEventListener('click', async () => { try { $('configText').value = JSON.stringify(await loadConfig(), null, 2); $('configDialog').showModal(); await loadServiceStatus(); } catch (error) { notice(error.message); } });
+$('enableService').addEventListener('click', () => serviceAction('enable'));
+$('disableService').addEventListener('click', () => serviceAction('disable'));
+$('refreshService').addEventListener('click', loadServiceStatus);
 $('saveConfig').addEventListener('click', async () => { try { config = await api('config', 'PUT', JSON.parse($('configText').value)); $('configDialog').close(); notice('Configuration saved.'); await refresh(); } catch (error) { alert(error.message); } });
 $('auth').addEventListener('click', () => $('authDialog').showModal());
 $('authForm').addEventListener('submit', async event => {

@@ -1,4 +1,4 @@
-# Dev Harbor — Simple PM2 Monitor
+# Simple PM2 Monitor
 
 A dependency-free Go web dashboard for managing .NET and Next.js projects on a Debian development server. The UI is embedded in the Go executable, so the dashboard needs no Node.js runtime, database, or separate frontend build. Running your projects requires PM2 and their .NET/Node.js tools.
 
@@ -29,7 +29,8 @@ If `projects.json` does not exist, a terminal setup wizard asks for:
 2. The listening port, defaulting to `8989`.
 3. An admin username, defaulting to `admin`.
 4. An admin password, which must not be empty.
-5. Whether you want to add project settings now, defaulting to no.
+5. Whether to run the dashboard as a systemd user service, defaulting to no.
+6. Whether you want to add project settings now, defaulting to no.
 
 Press Enter to accept a default. The password has no default and must be entered. If you choose to add a project, the wizard asks for its name, group, working directory, command, JSON argument array, environment variables, and project port. You can add multiple projects or configure them later through the web UI. Added projects are not started automatically. The terminal prompts and UI are in English. Use `y`/`yes` or `n`/`no` for setup questions.
 
@@ -313,6 +314,37 @@ If a target is down, first check the application's metrics URL with `curl` on th
 
 ## Keep the dashboard running with systemd
 
+Choose **Run as service** during first-run setup, or open **Configuration → Run as service** later. This installs and enables a systemd user service under the current OS user, preserving the PM2 executable, `PATH`, and `PM2_HOME`. The dashboard releases its HTTP port before starting the service; the web UI reconnects automatically. A working Linux systemd user manager is required. If first-run installation fails, the saved configuration is kept and the dashboard starts in the foreground with an error message.
+
+The default installed files are:
+
+- Unit: `~/.config/systemd/user/simple-pm2-monitor.service`.
+- Executable copy: `~/.local/share/simple-pm2-monitor/simple-pm2-monitor`.
+
+Absolute `XDG_CONFIG_HOME` and `XDG_DATA_HOME` values override these locations. The executable copy also makes installation from `go run` possible. The service reads the same absolute JSON configuration path; credentials are not copied into the unit. Service status comes from systemd rather than a JSON setting. An explicit command-line `-listen` override is retained in the unit; otherwise, the saved JSON address applies on restart. Custom units with the same name are not overwritten.
+
+**Configuration** shows service status, its unit path, and whether user lingering is enabled. **Disable autostart** disables future automatic starts while leaving the current dashboard running. To start the user manager at boot and keep it running after logout, enable lingering for your OS account. For example:
+
+```bash
+sudo loginctl enable-linger coolwolf
+```
+
+Replace `coolwolf` with your OS username. This administrator command is shown as a hint; the dashboard does not run it automatically. See the [loginctl documentation](https://manpages.debian.org/unstable/systemd/loginctl.1.en.html).
+
+Manage the installed user service from a terminal with:
+
+```bash
+systemctl --user status simple-pm2-monitor
+journalctl --user -u simple-pm2-monitor -f
+systemctl --user restart simple-pm2-monitor
+# Disable autostart and stop the dashboard immediately:
+systemctl --user disable --now simple-pm2-monitor
+```
+
+To update the installed executable, stop the user service, rebuild and launch the new repository executable in the foreground with the same configuration, then choose **Run as service** again. Rebuilding the repository alone does not replace the installed copy. This service keeps the dashboard running; it does not start your projects at boot.
+
+### Manual system service alternative
+
 Edit the user, executable/configuration paths, and `PATH` in `deploy/simple-pm2-monitor.service`. The dashboard must run as the same user and with the same `PM2_HOME` as PM2. Complete setup in a terminal before enabling the service, or prepare the JSON file manually. The service uses `-non-interactive` and reads its listening address and admin credentials from that file. It refuses to start if the file is missing or its credentials are incomplete.
 
 Keep `projects.json` private with `0600` file permissions and outside version control. Set its saved `listen` address to `0.0.0.0:8989` if you want the service to listen on all IPv4 interfaces.
@@ -340,6 +372,8 @@ node --test tests/auth-ui.test.cjs
 
 The default tests mock PM2 commands and do not start or stop real projects. They cover first-run setup, invalid input retries, interrupted setup, saved-address/CLI precedence, address and admin credential preservation during web configuration saves, admin login and password changes, rejection of Bearer authentication and environment credential overrides, access controls, atomic configuration persistence, group ordering and failures, PM2 ecosystem generation, multiple-instance totals, counter resets, log size limits, .NET solution/profile discovery, Next.js script ports, scan limits, authenticated discovery, individual project creation/editing/deletion, duplicate names, failed writes, watch mode persistence and launch argument conversion, and preservation of unrelated settings. Set `PM2_MONITOR_INTEGRATION=1` to additionally verify launch mode changes against a disposable PM2 daemon; it never uses your normal PM2 environment.
 
-The JavaScript tests verify username/password encoding (including Unicode), failed-login prompts, and rejection of previously stored Bearer authorization. They also cover saved group suggestions and filling the project form from discovered targets while preserving the chosen group. Editing and deletion flows are also covered. The tests use a simulated DOM rather than a browser, also verify that referenced controls exist in the HTML, and cover watch mode inference and saving.
+Service tests cover installation, executable copying, unit generation, unavailable user managers, custom unit protection, authenticated controls, and disabling autostart without stopping the dashboard. When available, `systemd-analyze verify` checks the generated unit. Set `PM2_MONITOR_SERVICE_INTEGRATION=1` to additionally test HTTP port handover using a temporary executable, configuration, and simulated systemctl; no real service is installed.
+
+The JavaScript tests verify username/password encoding (including Unicode), failed-login prompts, and rejection of previously stored Bearer authorization. They also cover saved group suggestions and filling the project form from discovered targets while preserving the chosen group. Editing and deletion flows are also covered. The tests use a simulated DOM rather than a browser, also verify that referenced controls exist in the HTML, and cover watch mode inference and saving, service status, service handover, and service action errors.
 
 Reference for PM2 application records: [Ecosystem file](https://pm2.keymetrics.io/docs/usage/application-declaration/).

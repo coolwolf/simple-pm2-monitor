@@ -44,6 +44,7 @@ type Config struct {
 	AdminUsername string    `json:"adminUsername,omitempty"`
 	AdminPassword string    `json:"adminPassword,omitempty"`
 	Projects      []Project `json:"projects"`
+	runAsService  bool
 }
 type Process struct {
 	ID    int    `json:"pm_id"`
@@ -86,6 +87,8 @@ type server struct {
 	run       func(context.Context, ...string) ([]byte, error)
 	samples   map[string]sample
 	client    *http.Client
+	service   *serviceManager
+	handoff   chan struct{}
 }
 
 func main() {
@@ -104,21 +107,48 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	s := &server{path: *config, pm2: *pm2, samples: map[string]sample{}, client: &http.Client{Timeout: 3 * time.Second}}
+	manager, serviceErr := newServiceManager(*config, *pm2, *listen, listenOverride)
+	if cfg.runAsService {
+		if serviceErr == nil {
+			serviceErr = manager.enable(context.Background())
+		}
+		if serviceErr == nil {
+			serviceErr = manager.start(context.Background())
+		}
+		if serviceErr == nil {
+			fmt.Printf("Dashboard is running as a user service at http://%s.\n", address)
+			return
+		}
+		log.Printf("Could not run as a service: %v. Continuing in the foreground; configure the service later in Configuration.", serviceErr)
+	}
+	s := &server{path: *config, pm2: *pm2, samples: map[string]sample{}, client: &http.Client{Timeout: 3 * time.Second}, service: manager, handoff: make(chan struct{}, 1)}
 	s.config = cfg
 	s.run = s.command
 	h := &http.Server{Addr: address, Handler: s.routes(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 90 * time.Second, IdleTimeout: 60 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	shutdown := make(chan bool, 1)
 	go func() {
-		<-ctx.Done()
+		asService := false
+		select {
+		case <-ctx.Done():
+		case <-s.handoff:
+			asService = true
+		}
 		c, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = h.Shutdown(c)
+		shutdown <- asService
 	}()
 	log.Printf("PM2 Monitor: http://%s (PM2 user: current OS user)", address)
 	if err = h.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
+	}
+	if <-shutdown {
+		if err = manager.start(context.Background()); err != nil {
+			log.Fatal("Could not start user service: ", err)
+		}
+		log.Print("Dashboard handed over to the user service.")
 	}
 }
 func (s *server) command(ctx context.Context, args ...string) ([]byte, error) {
@@ -222,6 +252,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/projects", s.handleProjects)
 	mux.HandleFunc("/api/action", s.handleAction)
 	mux.HandleFunc("/api/logs", s.handleLogs)
+	mux.HandleFunc("/api/service", s.handleService)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		path := "web" + r.URL.Path
 		if r.URL.Path == "/" {

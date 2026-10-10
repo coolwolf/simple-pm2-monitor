@@ -22,7 +22,7 @@ function harness(initialStorage={}, responses={}) {
     localStorage:{getItem:key=>storage.get(key),setItem:(key,value)=>storage.set(key,value)},
     FormData:class { entries(){return Object.entries({name:get('projectName').value,group:get('projectGroup').value,cwd:get('projectCwd').value,command:get('projectCommand').value,port:String(get('projectPort').value),args:get('projectArgs').value,env:get('projectEnv').value,metricsUrl:get('projectMetricsURL').value,requestMetric:get('projectRequestMetric').value});} },
     URL,window:{location:{hostname:'dev.example'}},
-    TextEncoder,btoa:value=>Buffer.from(value,'binary').toString('base64'),setInterval:()=>{},
+    TextEncoder,btoa:value=>Buffer.from(value,'binary').toString('base64'),setInterval:()=>{},setTimeout:()=>0,
     fetch:async(path,options)=>{
       requests.push({path,...options});
       const authorized=options.headers.Authorization===expectedBasic;
@@ -194,4 +194,34 @@ test('project port links use the dashboard hostname for IPv4, IPv6, and forwarde
   }
   const missing=vm.runInContext('projectPortCell(0)',h.context);
   assert.equal(missing.textContent,'—');assert.equal(missing.children.length,0);
+});
+
+
+test('Configuration exposes service status, enables handover, and preserves installation errors',async()=>{
+  const authorization='Basic '+Buffer.from('admin\u2603:password\u2603:123').toString('base64');
+  const status={available:true,installed:false,enabled:false,active:false,runningAsService:false,hint:'Enable linger for boot startup.'};
+  const h=harness({'pm2-authorization':authorization},{'/api/config':{projects:[]},'/api/service':options=>options.method==='POST'?{handoff:true,status,message:'Enabled'}:status});await flush();
+  await h.get('config').listeners.click();assert.equal(h.get('configDialog').open,true);
+  assert.equal(h.get('enableService').disabled,false);assert.equal(h.get('disableService').disabled,true);
+  await h.get('enableService').listeners.click();
+  const request=h.requests.find(item=>item.path==='/api/service'&&item.method==='POST');
+  assert.deepEqual(JSON.parse(request.body),{action:'enable'});
+  assert.match(h.get('serviceStatus').textContent,/Switching/);assert.equal(h.get('enableService').disabled,true);
+  const failed=harness({'pm2-authorization':authorization},{'/api/service':options=>{if(options.method==='POST')throw new Error('Cannot enable service');return status;}});await flush();
+  await failed.get('enableService').listeners.click();assert.match(failed.get('serviceError').textContent,/Cannot enable service/);
+});
+
+test('Disable autostart keeps the running dashboard available',async()=>{
+  const authorization='Basic '+Buffer.from('admin\u2603:password\u2603:123').toString('base64');
+  let enabled=true;
+  const h=harness({'pm2-authorization':authorization},{'/api/service':options=>{
+    if(options.method==='POST')enabled=false;
+    const status={available:true,installed:true,enabled,active:true,runningAsService:true};
+    return options.method==='POST'?{handoff:false,status,message:'Autostart disabled.'}:status;
+  }});await flush();
+  await h.get('refreshService').listeners.click();assert.equal(h.get('disableService').disabled,false);
+  await h.get('disableService').listeners.click();
+  const request=h.requests.find(item=>item.method==='POST');assert.deepEqual(JSON.parse(request.body),{action:'disable'});
+  assert.match(h.get('serviceStatus').textContent,/running as a user service/);
+  assert.equal(h.get('enableService').disabled,false);assert.equal(h.get('disableService').disabled,true);
 });

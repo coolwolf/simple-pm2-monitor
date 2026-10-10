@@ -184,6 +184,11 @@ func firstRun(input io.Reader, output io.Writer, address string) (Config, error)
 	if err = checkConfigListen(c.Listen, c); err != nil {
 		return c, err
 	}
+	serviceAnswer, err := t.ask("Run as service? (systemd user service, y/n)", "n", yesNo)
+	if err != nil {
+		return c, err
+	}
+	c.runAsService = isYes(serviceAnswer)
 	question := "Add project settings now? (y/n)"
 	for {
 		answer, err := t.ask(question, "n", yesNo)

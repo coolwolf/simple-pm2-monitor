@@ -12,11 +12,11 @@ import (
 func TestFirstRunDefaultsSavedAndNotAskedAgain(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "projects.json")
 	var out bytes.Buffer
-	c, address, err := prepareConfig(path, defaultListen, false, false, strings.NewReader("\n\n\nsetup-password\n\n"), &out)
+	c, address, err := prepareConfig(path, defaultListen, false, false, strings.NewReader("\n\n\nsetup-password\n\n\n"), &out)
 	if err != nil || address != defaultListen || c.Listen != defaultListen || len(c.Projects) != 0 {
 		t.Fatalf("%+v %s %v", c, address, err)
 	}
-	for _, prompt := range []string{"Listening IP", "Listening port", "Admin username", "Admin password", "Add project settings"} {
+	for _, prompt := range []string{"Listening IP", "Listening port", "Admin username", "Admin password", "Run as service", "Add project settings"} {
 		if !strings.Contains(out.String(), prompt) {
 			t.Fatal(out.String())
 		}
@@ -42,7 +42,7 @@ func TestFirstRunDefaultsSavedAndNotAskedAgain(t *testing.T) {
 func TestFirstRunProjectsAndRetryInvalidInputs(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "projects.json")
 	input := strings.Join([]string{
-		"bad-ip", "::1", "0", "99999", "9090", "bad:user", "admin", "", "setup-password", "maybe", "y",
+		"bad-ip", "::1", "0", "99999", "9090", "bad:user", "admin", "", "setup-password", "n", "maybe", "y",
 		"", "api", "shop", "relative", "/srv/api", "", "/usr/bin/dotnet",
 		"null", `[1]`, `["watch","run"]`, `[]`, `{"MODE":123}`, `{"MODE":"dev"}`, "-1", "5001",
 		"y", "api", "web", "shop", "/srv/web", "/usr/bin/npm", `["run","dev"]`, `{}`, "3000", "n",
@@ -110,7 +110,7 @@ func TestNonInteractiveRequiresExistingConfiguration(t *testing.T) {
 		t.Fatal("saved config failed", err)
 	}
 	var out bytes.Buffer
-	c, err = firstRun(strings.NewReader("0.0.0.0\n\n\nsetup-password\nn\n"), &out, defaultListen)
+	c, err = firstRun(strings.NewReader("0.0.0.0\n\n\nsetup-password\nn\nn\n"), &out, defaultListen)
 	if err != nil || c.Listen != "0.0.0.0:8989" || c.AdminUsername != "admin" || c.AdminPassword != "setup-password" {
 		t.Fatal("public wizard failed", err)
 	}

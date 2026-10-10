@@ -11,3 +11,5 @@
 #watchLabel[hidden]{display:none}#watchLabel p{margin:5px 0 0}#projectWatch{margin-top:0}
 
 .port-link{color:var(--accent);text-decoration:none;border-bottom:1px dotted currentColor}.port-link:hover{text-decoration:underline}.port-link:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:2px}
+
+.service-settings{background:#0d1520;border:1px solid var(--line);border-radius:8px;padding:16px;margin:18px 0}.service-settings h3{margin:0}.service-actions{display:flex;flex-wrap:wrap;gap:8px}#serviceHint,#serviceError{white-space:pre-wrap;overflow-wrap:anywhere}

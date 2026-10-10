@@ -274,6 +274,18 @@
         Projects stop in reverse order. Removing a project does not stop its PM2
         processes. Projects with an explicit watchFiles setting apply launch settings on Restart. Other command/environment changes apply to new PM2 records.
       </p>
+      <section class="service-settings">
+        <h3>Run as service</h3>
+        <p>Keep the dashboard running with a systemd service under the same OS user as PM2. Saving JSON does not change the service.</p>
+        <p id="serviceStatus" role="status">Checking service status…</p>
+        <p id="serviceHint"></p>
+        <p id="serviceError" class="form-error" role="alert"></p>
+        <div class="service-actions">
+          <button id="enableService" type="button" class="primary" disabled>Run as service</button>
+          <button id="disableService" type="button" disabled>Disable autostart</button>
+          <button id="refreshService" type="button">Refresh status</button>
+        </div>
+      </section>
       <textarea
         id="configText"
         rows="20"
